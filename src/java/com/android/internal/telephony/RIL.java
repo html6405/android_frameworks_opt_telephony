@@ -255,6 +255,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     AtomicBoolean mTestingEmergencyCall = new AtomicBoolean(false);
 
     final Integer mPhoneId;
+    private List<String> mOldRilFeatures;
 
     private static final String PROPERTY_IS_VONR_ENABLED = "persist.radio.is_vonr_enabled_";
 
@@ -619,6 +620,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
         if (isRadioBugDetectionEnabled()) {
             mRadioBugDetector = new RadioBugDetector(context, mPhoneId);
         }
+
+        final String oldRilFeatures = SystemProperties.get("ro.telephony.ril.config", "");
+        mOldRilFeatures = Arrays.asList(oldRilFeatures.split(","));
 
         TelephonyManager tm = (TelephonyManager) context.getSystemService(
                 Context.TELEPHONY_SERVICE);
@@ -4678,8 +4682,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     }
 
     @Override
-    public void setUiccSubscription(int slotId, int appIndex, int subId,
-                                    int subStatus, Message result) {
+    public void setUiccSubscription(int appIndex, boolean activate, Message result) {
         IRadio radioProxy = getRadioProxy(result);
         if (radioProxy != null) {
             RILRequest rr = obtainRequest(RIL_REQUEST_SET_UICC_SUBSCRIPTION, result,
@@ -4687,15 +4690,14 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
             if (RILJ_LOGD) {
                 riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
-                        + " slot = " + slotId + " appIndex = " + appIndex
-                        + " subId = " + subId + " subStatus = " + subStatus);
+                        + " appIndex: " + appIndex + " activate: " + activate);
             }
 
             SelectUiccSub info = new SelectUiccSub();
-            info.slot = slotId;
+            info.slot = mPhoneId;
             info.appIndex = appIndex;
-            info.subType = subId;
-            info.actStatus = subStatus;
+            info.subType = mPhoneId;
+            info.actStatus = activate ? 1 : 0;
 
             try {
                 radioProxy.setUiccSubscription(rr.mSerial, info);
@@ -7810,5 +7812,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
      */
     public HalVersion getHalVersion() {
         return mRadioVersion;
+    }
+
+    public boolean needsOldRilFeature(String feature) {
+        return mOldRilFeatures.contains(feature);
     }
 }
