@@ -4261,6 +4261,8 @@ public class RILUtils {
 
         IccCardStatus iccCardStatus = new IccCardStatus();
         if (cardStatus10 != null) {
+            IccSlotPortMapping slotPortMapping = new IccSlotPortMapping();
+            iccCardStatus.mSlotPortMapping = slotPortMapping;
             iccCardStatus.setCardState(cardStatus10.cardState);
             iccCardStatus.setUniversalPinState(cardStatus10.universalPinState);
             iccCardStatus.mGsmUmtsSubscriptionAppIndex = cardStatus10.gsmUmtsSubscriptionAppIndex;
