@@ -30,11 +30,14 @@ import android.util.Log;
 import com.android.internal.telephony.CommandsInterface;
 import com.android.internal.telephony.GsmAlphabet;
 import com.android.internal.telephony.MccTable;
+import com.android.internal.telephony.RIL;
 import com.android.internal.telephony.SubscriptionController;
 import com.android.internal.telephony.cdma.sms.UserData;
 import com.android.internal.telephony.uicc.IccCardApplicationStatus.AppType;
 import com.android.internal.util.BitwiseInputStream;
 import com.android.telephony.Rlog;
+
+import static com.android.internal.telephony.uicc.IccConstants.FAKE_ICCID;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -663,10 +666,14 @@ public class RuimRecords extends IccRecords {
             case EVENT_GET_CDMA_SUBSCRIPTION_DONE:
                 ar = (AsyncResult)msg.obj;
                 String localTemp[] = (String[])ar.result;
-                if (ar.exception != null) {
-                    break;
+                if (!RIL.needsOldRilFeature("fakeiccid")) {
+                    if (ar.exception != null) {
+                        break;
+                    }
+                } else {
+                    mIccId = FAKE_ICCID;
+                    mFullIccId = FAKE_ICCID;
                 }
-
                 mMyMobileNumber = localTemp[0];
                 mMin2Min1 = localTemp[3];
                 mPrlVersion = localTemp[4];
@@ -681,12 +688,16 @@ public class RuimRecords extends IccRecords {
                 ar = (AsyncResult)msg.obj;
                 data = (byte[])ar.result;
 
-                if (ar.exception != null) {
-                    break;
+                if (!RIL.needsOldRilFeature("fakeiccid")) {
+                    if (ar.exception != null) {
+                        break;
+                    }
+                    mIccId = IccUtils.bcdToString(data, 0, data.length);
+                    mFullIccId = IccUtils.bchToString(data, 0, data.length);
+                } else {
+                    mIccId = FAKE_ICCID;
+                    mFullIccId = FAKE_ICCID;
                 }
-
-                mIccId = IccUtils.bcdToString(data, 0, data.length);
-                mFullIccId = IccUtils.bchToString(data, 0, data.length);
 
                 log("iccid: " + SubscriptionInfo.givePrintableIccid(mFullIccId));
 
