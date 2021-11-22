@@ -1134,6 +1134,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
             if (proxies == null) throw ex;
         }
 
+
         mUseOldMncMccFormat = SystemProperties.getBoolean(
                 "ro.telephony.use_old_mnc_mcc_format", false);
 
@@ -1367,7 +1368,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
         }
     }
 
-    
+
     private boolean canMakeRequest(String request, RadioServiceProxy proxy, Message result,
             HalVersion version) {
         int service = HAL_SERVICE_RADIO;
@@ -7062,5 +7063,37 @@ public class RIL extends BaseCommands implements CommandsInterface {
             default:
                 return "UNKNOWN:" + service;
         }
+    }
+
+    public static boolean needsOldRilFeature(String feature) {
+        List<String> oldRilFeatures = Arrays.asList(SystemProperties.get("ro.telephony.ril.config", "").split(","));
+
+        return oldRilFeatures.contains(feature);
+    }
+
+    public static ArrayList<Byte> primitiveArrayToArrayList(byte[] arr) {
+        ArrayList<Byte> arrayList = new ArrayList<>(arr.length);
+        for (byte b : arr) {
+            arrayList.add(b);
+        }
+        return arrayList;
+    }
+
+    /** Convert a primitive int array to an ArrayList<Integer>. */
+    public static ArrayList<Integer> primitiveArrayToArrayList(int[] arr) {
+        ArrayList<Integer> arrayList = new ArrayList<>(arr.length);
+        for (int i : arr) {
+            arrayList.add(i);
+        }
+        return arrayList;
+    }
+
+    /** Convert an ArrayList of Bytes to an exactly-sized primitive array */
+    public static byte[] arrayListToPrimitiveArray(ArrayList<Byte> bytes) {
+        byte[] ret = new byte[bytes.size()];
+        for (int i = 0; i < ret.length; i++) {
+            ret[i] = bytes.get(i);
+        }
+        return ret;
     }
 }
