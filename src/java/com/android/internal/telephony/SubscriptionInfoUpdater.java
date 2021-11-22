@@ -35,6 +35,7 @@ import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.PersistableBundle;
 import android.os.UserHandle;
+import android.os.SystemProperties;
 import android.preference.PreferenceManager;
 import android.service.carrier.CarrierIdentifier;
 import android.service.carrier.CarrierService;
@@ -1136,6 +1137,7 @@ public class SubscriptionInfoUpdater extends Handler {
         SubscriptionManager.putPhoneIdAndSubIdExtra(i, phoneId);
         logd("Broadcasting intent ACTION_SIM_STATE_CHANGED " + state + " reason " + reason +
                 " for phone: " + phoneId);
+        SystemProperties.set("gsm.sim_state", state);
         IntentBroadcaster.getInstance().broadcastStickyIntent(sContext, i, phoneId);
     }
 
