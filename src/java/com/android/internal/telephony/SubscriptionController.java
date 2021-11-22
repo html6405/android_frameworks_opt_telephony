@@ -45,6 +45,7 @@ import android.os.PersistableBundle;
 import android.os.RegistrantList;
 import android.os.RemoteException;
 import android.os.TelephonyServiceManager.ServiceRegisterer;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.telecom.PhoneAccountHandle;
@@ -2533,6 +2534,7 @@ public class SubscriptionController extends ISub.Stub {
 
     @Override
     public int getSlotIndex(int subId) {
+        SystemProperties.set("gsm.subid", String.valueOf(subId));
         if (VDBG) printStackTrace("[getSlotIndex] subId=" + subId);
 
         if (subId == SubscriptionManager.DEFAULT_SUBSCRIPTION_ID) {
@@ -2540,6 +2542,7 @@ public class SubscriptionController extends ISub.Stub {
         }
         if (!SubscriptionManager.isValidSubscriptionId(subId)) {
             if (DBG) logd("[getSlotIndex]- subId invalid");
+            SystemProperties.set("gsm.radioreset", "true");
             return SubscriptionManager.INVALID_SIM_SLOT_INDEX;
         }
 
