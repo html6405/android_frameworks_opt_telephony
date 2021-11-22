@@ -2542,7 +2542,8 @@ public class SubscriptionController extends ISub.Stub {
         }
         if (!SubscriptionManager.isValidSubscriptionId(subId)) {
             if (DBG) logd("[getSlotIndex]- subId invalid");
-            SystemProperties.set("gsm.radioreset", "true");
+            if (!RIL.needsOldRilFeature("fakeiccid"))
+                SystemProperties.set("gsm.radioreset", "true");
             return SubscriptionManager.INVALID_SIM_SLOT_INDEX;
         }
 
