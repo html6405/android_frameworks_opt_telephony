@@ -3024,10 +3024,12 @@ public class ServiceStateTracker extends Handler {
                 final boolean forceDisplayNoService = shouldForceDisplayNoService() && !mIsSimReady;
                 if (!forceDisplayNoService && Phone.isEmergencyCallOnly()) {
                     // No service but emergency call allowed
+                    SystemProperties.set("gsm.status", "0");
                     plmn = Resources.getSystem()
                             .getText(com.android.internal.R.string.emergency_calls_only).toString();
                 } else {
                     // No service at all
+                    SystemProperties.set("gsm.status", "1");
                     plmn = Resources.getSystem()
                             .getText(
                                 com.android.internal.R.string.lockscreen_carrier_default)
@@ -3038,6 +3040,7 @@ public class ServiceStateTracker extends Handler {
                         "of service, set plmn='" + plmn + "'");
             } else if (combinedRegState == ServiceState.STATE_IN_SERVICE) {
                 // In either home or roaming service
+                SystemProperties.set("gsm.status", "2");
                 plmn = mSS.getOperatorAlpha();
                 showPlmn = !TextUtils.isEmpty(plmn) &&
                         ((rule & CARRIER_NAME_DISPLAY_BITMASK_SHOW_PLMN)
@@ -3045,6 +3048,7 @@ public class ServiceStateTracker extends Handler {
                 if (DBG) log("updateSpnDisplay: rawPlmn = " + plmn);
             } else {
                 // Power off state, such as airplane mode, show plmn as null
+                SystemProperties.set("gsm.status", "3");
                 showPlmn = true;
                 plmn = null;
                 if (DBG) log("updateSpnDisplay: radio is off w/ showPlmn="
@@ -3121,6 +3125,8 @@ public class ServiceStateTracker extends Handler {
 
             // mOperatorAlpha contains the ERI text
             plmn = mSS.getOperatorAlpha();
+            SystemProperties.set("gsm.plmn", plmn);
+
             if (DBG) log("updateSpnDisplay: cdma rawPlmn = " + plmn);
 
             showPlmn = plmn != null;
