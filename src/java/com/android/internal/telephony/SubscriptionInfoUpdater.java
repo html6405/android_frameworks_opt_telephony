@@ -60,6 +60,9 @@ import com.android.internal.telephony.uicc.IccUtils;
 import com.android.internal.telephony.uicc.UiccCard;
 import com.android.internal.telephony.uicc.UiccController;
 import com.android.internal.telephony.uicc.UiccSlot;
+import com.android.internal.telephony.RIL;
+
+import static com.android.internal.telephony.uicc.IccConstants.FAKE_ICCID;
 import com.android.telephony.Rlog;
 
 import java.io.FileDescriptor;
@@ -97,6 +100,9 @@ public class SubscriptionInfoUpdater extends Handler {
 
     private static final ParcelUuid REMOVE_GROUP_UUID =
             ParcelUuid.fromString(CarrierConfigManager.REMOVE_GROUP_UUID_STRING);
+
+    // Fake ICCID
+    private static final String FAKE_ICCID = "00000000000001";
 
     // Key used to read/write the current IMSI. Updated on SIM_STATE_CHANGED - LOADED.
     public static final String CURR_SUBID = "curr_subid";
@@ -452,7 +458,10 @@ public class SubscriptionInfoUpdater extends Handler {
             // 2) Its uicc applications are set to be disabled.
             // At this phase, the subscription list is accessible. Treating NOT_READY
             // as equivalent to ABSENT, once the rest of the system can handle it.
-            sIccId[phoneId] = ICCID_STRING_FOR_NO_SIM;
+            if (!RIL.needsOldRilFeature("fakeiccid"))
+                sIccId[phoneId] = ICCID_STRING_FOR_NO_SIM;
+            else
+                sIccId[phoneId] = FAKE_ICCID;
             updateSubscriptionInfoByIccId(phoneId, false /* updateEmbeddedSubs */);
         } else {
             sIccId[phoneId] = null;
@@ -666,7 +675,10 @@ public class SubscriptionInfoUpdater extends Handler {
                     SubscriptionManager.ICC_ID + "=\'" + iccId + "\'", null);
             sInactiveIccIds[phoneId] = null;
         }
-        sIccId[phoneId] = ICCID_STRING_FOR_NO_SIM;
+        if (!RIL.needsOldRilFeature("fakeiccid"))
+            sIccId[phoneId] = ICCID_STRING_FOR_NO_SIM;
+        else
+            sIccId[phoneId] = FAKE_ICCID;
         updateSubscriptionInfoByIccId(phoneId, true /* updateEmbeddedSubs */);
     }
 
@@ -680,25 +692,35 @@ public class SubscriptionInfoUpdater extends Handler {
         }
         cleanSubscriptionInPhone(phoneId, true);
 
-        broadcastSimStateChanged(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT, null);
-        broadcastSimCardStateChanged(phoneId, TelephonyManager.SIM_STATE_ABSENT);
-        broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_UNKNOWN);
-        updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
-        updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
+        if (!RIL.needsOldRilFeature("fakeiccid")) {
+            broadcastSimStateChanged(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT, null);
+            broadcastSimCardStateChanged(phoneId, TelephonyManager.SIM_STATE_ABSENT);
+            broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_UNKNOWN);
+            updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
+            updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
+        }
     }
 
     protected void handleSimError(int phoneId) {
         if (sIccId[phoneId] != null && !sIccId[phoneId].equals(ICCID_STRING_FOR_NO_SIM)) {
             logd("SIM" + (phoneId + 1) + " Error ");
         }
-        sIccId[phoneId] = ICCID_STRING_FOR_NO_SIM;
+
+        if (!RIL.needsOldRilFeature("fakeiccid"))
+            sIccId[phoneId] = ICCID_STRING_FOR_NO_SIM;
+        else
+            sIccId[phoneId] = FAKE_ICCID;
+
         updateSubscriptionInfoByIccId(phoneId, true /* updateEmbeddedSubs */);
-        broadcastSimStateChanged(phoneId, IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR,
-                IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR);
-        broadcastSimCardStateChanged(phoneId, TelephonyManager.SIM_STATE_CARD_IO_ERROR);
-        broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_NOT_READY);
-        updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR);
-        updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR);
+
+        if (!RIL.needsOldRilFeature("fakeiccid")) {
+            broadcastSimStateChanged(phoneId, IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR,
+                    IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR);
+            broadcastSimCardStateChanged(phoneId, TelephonyManager.SIM_STATE_CARD_IO_ERROR);
+            broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_NOT_READY);
+            updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR);
+            updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_CARD_IO_ERROR);
+        }
     }
 
     protected synchronized void updateSubscriptionInfoByIccId(int phoneId,

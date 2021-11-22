@@ -255,7 +255,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
     AtomicBoolean mTestingEmergencyCall = new AtomicBoolean(false);
 
     final Integer mPhoneId;
-    private List<String> mOldRilFeatures;
     private boolean mUseOldMncMccFormat;
 
     private static final String PROPERTY_IS_VONR_ENABLED = "persist.radio.is_vonr_enabled_";
@@ -622,8 +621,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
             mRadioBugDetector = new RadioBugDetector(context, mPhoneId);
         }
 
-        final String oldRilFeatures = SystemProperties.get("ro.telephony.ril.config", "");
-        mOldRilFeatures = Arrays.asList(oldRilFeatures.split(","));
 
         mUseOldMncMccFormat = SystemProperties.getBoolean(
                 "ro.telephony.use_old_mnc_mcc_format", false);
@@ -7826,7 +7823,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
         return mRadioVersion;
     }
 
-    public boolean needsOldRilFeature(String feature) {
-        return mOldRilFeatures.contains(feature);
+    public static boolean needsOldRilFeature(String feature) {
+        List<String> oldRilFeatures = Arrays.asList(SystemProperties.get("ro.telephony.ril.config", "").split(","));
+
+        return oldRilFeatures.contains(feature);
     }
 }
