@@ -55,6 +55,7 @@ import com.android.internal.telephony.SubscriptionInfoUpdater;
 import com.android.internal.telephony.uicc.euicc.EuiccCard;
 import com.android.internal.telephony.util.TelephonyUtils;
 import com.android.telephony.Rlog;
+import com.android.internal.telephony.RIL;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -684,11 +685,13 @@ public class UiccController extends Handler {
     }
 
     private synchronized void onGetIccCardStatusDone(AsyncResult ar, Integer index) {
-        if (ar.exception != null) {
-            Rlog.e(LOG_TAG,"Error getting ICC status. "
-                    + "RIL_REQUEST_GET_ICC_STATUS should "
-                    + "never return an error", ar.exception);
-            return;
+        if (!RIL.needsOldRilFeature("fakeiccid")) {
+            if (ar.exception != null) {
+                Rlog.e(LOG_TAG, "Error getting ICC status. "
+                        + "RIL_REQUEST_GET_ICC_STATUS should "
+                        + "never return an error", ar.exception);
+                return;
+            }
         }
         if (!isValidPhoneIndex(index)) {
             Rlog.e(LOG_TAG,"onGetIccCardStatusDone: invalid index : " + index);
