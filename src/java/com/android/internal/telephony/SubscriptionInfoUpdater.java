@@ -694,13 +694,13 @@ public class SubscriptionInfoUpdater extends Handler {
         }
         cleanSubscriptionInPhone(phoneId, true);
 
-        if (!RIL.needsOldRilFeature("fakeiccid")) {
-            broadcastSimStateChanged(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT, null);
-            broadcastSimCardStateChanged(phoneId, TelephonyManager.SIM_STATE_ABSENT);
-            broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_UNKNOWN);
-            updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
-            updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
-        }
+        broadcastSimStateChanged(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT, null);
+        broadcastSimCardStateChanged(phoneId, TelephonyManager.SIM_STATE_ABSENT);
+        broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_UNKNOWN);
+        updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
+        updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
+        if (!RIL.needsOldRilFeature("fakeiccid"))
+            SystemProperties.set("gsm.radioreset", "true");
     }
 
     protected void handleSimError(int phoneId) {
