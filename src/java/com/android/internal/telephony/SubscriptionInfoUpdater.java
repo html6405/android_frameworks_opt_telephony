@@ -281,8 +281,6 @@ public class SubscriptionInfoUpdater extends Handler {
                 broadcastSimApplicationStateChanged(msg.arg1, TelephonyManager.SIM_STATE_UNKNOWN);
                 updateSubscriptionCarrierId(msg.arg1, IccCardConstants.INTENT_VALUE_ICC_UNKNOWN);
                 updateCarrierServices(msg.arg1, IccCardConstants.INTENT_VALUE_ICC_UNKNOWN);
-                if (RIL.needsOldRilFeature("fakeiccid"))
-                    SystemProperties.set("gsm.radioreset", "true");
                 break;
 
             case EVENT_SIM_IO_ERROR:
