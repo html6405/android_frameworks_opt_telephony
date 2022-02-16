@@ -697,8 +697,6 @@ public class SubscriptionInfoUpdater extends Handler {
         broadcastSimApplicationStateChanged(phoneId, TelephonyManager.SIM_STATE_UNKNOWN);
         updateSubscriptionCarrierId(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
         updateCarrierServices(phoneId, IccCardConstants.INTENT_VALUE_ICC_ABSENT);
-        if (!RIL.needsOldRilFeature("fakeiccid"))
-            SystemProperties.set("gsm.radioreset", "true");
     }
 
     protected void handleSimError(int phoneId) {
