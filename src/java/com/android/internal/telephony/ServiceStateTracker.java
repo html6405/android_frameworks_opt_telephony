@@ -1370,8 +1370,9 @@ public class ServiceStateTracker extends Handler {
                 }
                 // This will do nothing in the 'radio not available' case
                 setPowerStateToDesired();
-                // These events are modem triggered, so pollState() needs to be forced
-                pollStateInternal(true);
+                boolean forceTrigger =
+                    mCi.getRadioState() != TelephonyManager.RADIO_POWER_OFF;
+                pollStateInternal(forceTrigger);
                 break;
 
             case EVENT_NETWORK_STATE_CHANGED:
@@ -5249,6 +5250,11 @@ public class ServiceStateTracker extends Handler {
     }
 
     private void updateReportingCriteria(PersistableBundle config) {
+        if (SystemProperties.getBoolean(
+            "ro.telephony.bypass.signalstrenthreporting", false)) {
+            return;
+        }
+
         int lteMeasurementEnabled = config.getInt(CarrierConfigManager
                 .KEY_PARAMETERS_USED_FOR_LTE_SIGNAL_BAR_INT, CellSignalStrengthLte.USE_RSRP);
         mPhone.setSignalStrengthReportingCriteria(SignalThresholdInfo.SIGNAL_MEASUREMENT_TYPE_RSRP,
