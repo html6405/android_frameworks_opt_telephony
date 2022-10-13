@@ -37,6 +37,7 @@ import android.hardware.radio.V1_0.RadioIndicationType;
 import android.hardware.radio.V1_0.RadioResponseInfo;
 import android.hardware.radio.V1_0.RadioResponseType;
 import android.hardware.radio.V1_0.SelectUiccSub;
+import android.hardware.radio.deprecated.V1_0.IOemHook;
 import android.net.KeepalivePacketData;
 import android.net.LinkProperties;
 import android.os.AsyncResult;
@@ -228,6 +229,13 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     private static final String PROPERTY_IS_VONR_ENABLED = "persist.radio.is_vonr_enabled_";
 
+    public static final int RADIO_SERVICE = 0;
+    public static final int DATA_SERVICE = 1;
+    public static final int MESSAGING_SERVICE = 2;
+    public static final int MODEM_SERVICE = 3;
+    public static final int NETWORK_SERVICE = 4;
+    public static final int SIM_SERVICE = 5;
+    public static final int VOICE_SERVICE = 6;
     public static final int MIN_SERVICE_IDX = HAL_SERVICE_RADIO;
 
     public static final int MAX_SERVICE_IDX = HAL_SERVICE_IMS;
@@ -239,6 +247,12 @@ public class RIL extends BaseCommands implements CommandsInterface {
      * will return a set of all phone ID slots that are disabled for IRadio.
      */
     private final SparseArray<Set<Integer>> mDisabledRadioServices = new SparseArray<>();
+
+    /**
+     * A set that records if oem hook service is disabled in hal for
+     * a specific phone id slot to avoid further getService request.
+     */
+    Set<Integer> mDisabledOemHookServices = new HashSet();
 
     /* default work source which will blame phone process */
     private WorkSource mRILDefaultWorkSource;
@@ -275,6 +289,9 @@ public class RIL extends BaseCommands implements CommandsInterface {
     private final RadioProxyDeathRecipient mRadioProxyDeathRecipient;
     final RilHandler mRilHandler;
     private MockModem mMockModem;
+    OemHookResponse mOemHookResponse;
+    OemHookIndication mOemHookIndication;
+    volatile IOemHook mOemHookProxy = null;
 
     // Thread-safe HashMap to map from RIL_REQUEST_XXX constant to HalVersion.
     // This is for Radio HAL Fallback Compatibility feature. When a RIL request
@@ -481,6 +498,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
     private synchronized void resetProxyAndRequestList(int service) {
         if (service == HAL_SERVICE_RADIO) {
             mRadioProxy = null;
+	    mOemHookProxy = null;
         } else {
             mServiceProxies.get(service).clear();
         }
@@ -498,6 +516,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
         if (service == HAL_SERVICE_RADIO) {
             getRadioProxy(null);
+	    getOemHookProxy(null);
         } else {
             getRadioServiceProxy(service, null);
         }
@@ -1085,6 +1104,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 // Try to connect to RIL services and set response functions.
                 if (service == HAL_SERVICE_RADIO) {
                     getRadioProxy(null);
+		    getOemHookProxy(null);
                 } else {
                     getRadioServiceProxy(service, null);
                 }
@@ -1092,6 +1112,59 @@ public class RIL extends BaseCommands implements CommandsInterface {
                 resetProxyAndRequestList(service);
             }
         }
+    }
+
+    /** Returns an {@link IOemHook} instance or null if the service is not available. */
+    @VisibleForTesting
+    public synchronized IOemHook getOemHookProxy(Message result) {
+        if (!SubscriptionManager.isValidPhoneId((mPhoneId))) return null;
+        if (!mIsCellularSupported) {
+            if (RILJ_LOGV) riljLog("getOemHookProxy: Not calling getService(): wifi-only");
+            if (result != null) {
+                AsyncResult.forMessage(result, null,
+                        CommandException.fromRilErrno(RADIO_NOT_AVAILABLE));
+                result.sendToTarget();
+            }
+            return null;
+        }
+
+        if (mOemHookProxy != null) {
+            return mOemHookProxy;
+        }
+
+        try {
+            if (mDisabledOemHookServices.contains(mPhoneId)) {
+                riljLoge("getOemHookProxy: mOemHookProxy for " + HIDL_SERVICE_NAME[mPhoneId]
+                        + " is disabled");
+            } else {
+                mOemHookProxy = IOemHook.getService(HIDL_SERVICE_NAME[mPhoneId], true);
+                if (mOemHookProxy != null) {
+                    // not calling linkToDeath() as ril service runs in the same process and death
+                    // notification for that should be sufficient
+                    mOemHookProxy.setResponseFunctions(mOemHookResponse, mOemHookIndication);
+                } else {
+                    mDisabledOemHookServices.add(mPhoneId);
+                    riljLoge("getOemHookProxy: mOemHookProxy for " + HIDL_SERVICE_NAME[mPhoneId]
+                            + " is disabled");
+                }
+            }
+        } catch (NoSuchElementException e) {
+            mOemHookProxy = null;
+            riljLoge("IOemHook service is not on the device HAL: " + e);
+        }  catch (RemoteException e) {
+            mOemHookProxy = null;
+            riljLoge("OemHookProxy getService/setResponseFunctions: " + e);
+        }
+
+        if (mOemHookProxy == null) {
+            if (result != null) {
+                AsyncResult.forMessage(result, null,
+                        CommandException.fromRilErrno(RADIO_NOT_AVAILABLE));
+                result.sendToTarget();
+            }
+        }
+
+        return mOemHookProxy;
     }
 
     //***** Constructors
@@ -1162,6 +1235,8 @@ public class RIL extends BaseCommands implements CommandsInterface {
         mSimIndication = new SimIndication(this);
         mVoiceResponse = new VoiceResponse(this);
         mVoiceIndication = new VoiceIndication(this);
+	mOemHookResponse = new OemHookResponse(this);
+	mOemHookIndication = new OemHookIndication(this);
         mRilHandler = new RilHandler();
         mRadioProxyDeathRecipient = new RadioProxyDeathRecipient();
         for (int service = MIN_SERVICE_IDX; service <= MAX_SERVICE_IDX; service++) {
@@ -1222,6 +1297,7 @@ public class RIL extends BaseCommands implements CommandsInterface {
         for (int service = MIN_SERVICE_IDX; service <= MAX_SERVICE_IDX; service++) {
             if (service == HAL_SERVICE_RADIO) {
                 getRadioProxy(null);
+		getOemHookProxy(null);
             } else {
                 if (proxies == null) {
                     // Prevent telephony tests from calling the service
@@ -2830,15 +2906,57 @@ public class RIL extends BaseCommands implements CommandsInterface {
         }
     }
 
-    // TODO(b/171260715) Remove when HAL definition is removed
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     @Override
     public void invokeOemRilRequestRaw(byte[] data, Message response) {
+        IOemHook oemHookProxy = getOemHookProxy(response);
+        if (oemHookProxy != null) {
+            RILRequest rr = obtainRequest(RIL_REQUEST_OEM_HOOK_RAW, response,
+                    mRILDefaultWorkSource);
+
+            if (RILJ_LOGD) {
+                riljLog(rr.serialString() + "> OEM_HOOK_RAW [" + IccUtils.bytesToHexString(data) + "]");
+            }
+
+            try {
+                oemHookProxy.sendRequestRaw(rr.mSerial, primitiveArrayToArrayList(data));
+            } catch (RemoteException | RuntimeException e) {
+                handleRadioProxyExceptionForRR(RADIO_SERVICE, "invokeOemRilRequestRaw", e);
+            }
+        } else {
+            // OEM Hook service is disabled for P and later devices.
+            // Deprecated OEM Hook APIs will perform no-op before being removed.
+            if (RILJ_LOGD) riljLog("Radio Oem Hook Service is disabled for P and later devices. ");
+        }
     }
 
-    // TODO(b/171260715) Remove when HAL definition is removed
     @Override
     public void invokeOemRilRequestStrings(String[] strings, Message result) {
+        IOemHook oemHookProxy = getOemHookProxy(result);
+        if (oemHookProxy != null) {
+            RILRequest rr = obtainRequest(RIL_REQUEST_OEM_HOOK_STRINGS, result,
+                    mRILDefaultWorkSource);
+
+            String logStr = "";
+            for (int i = 0; i < strings.length; i++) {
+                logStr = logStr + strings[i] + " ";
+            }
+            if (RILJ_LOGD) {
+                riljLog(rr.serialString() + "> " +  "OEM_HOOK_STRINGS strings = "
+                        + logStr);
+            }
+
+            try {
+                oemHookProxy.sendRequestStrings(rr.mSerial,
+                        new ArrayList<String>(Arrays.asList(strings)));
+            } catch (RemoteException | RuntimeException e) {
+                handleRadioProxyExceptionForRR(RADIO_SERVICE, "invokeOemRilRequestStrings", e);
+            }
+        } else {
+            // OEM Hook service is disabled for P and later devices.
+            // Deprecated OEM Hook APIs will perform no-op before being removed.
+            if (RILJ_LOGD) riljLog("Radio Oem Hook Service is disabled for P and later devices. ");
+        }
     }
 
     @Override
@@ -7003,5 +7121,31 @@ public class RIL extends BaseCommands implements CommandsInterface {
 
     public boolean needsOldRilFeature(String feature) {
         return mOldRilFeatures.contains(feature);
+    }
+
+    public static ArrayList<Byte> primitiveArrayToArrayList(byte[] arr) {
+        ArrayList<Byte> arrayList = new ArrayList<>(arr.length);
+        for (byte b : arr) {
+            arrayList.add(b);
+        }
+        return arrayList;
+    }
+
+    /** Convert a primitive int array to an ArrayList<Integer>. */
+    public static ArrayList<Integer> primitiveArrayToArrayList(int[] arr) {
+        ArrayList<Integer> arrayList = new ArrayList<>(arr.length);
+        for (int i : arr) {
+            arrayList.add(i);
+        }
+        return arrayList;
+    }
+
+    /** Convert an ArrayList of Bytes to an exactly-sized primitive array */
+    public static byte[] arrayListToPrimitiveArray(ArrayList<Byte> bytes) {
+        byte[] ret = new byte[bytes.size()];
+        for (int i = 0; i < ret.length; i++) {
+            ret[i] = bytes.get(i);
+        }
+        return ret;
     }
 }
