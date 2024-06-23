@@ -48,6 +48,7 @@ import com.android.internal.telephony.uicc.euicc.EuiccCard;
 import com.android.internal.telephony.util.ArrayUtils;
 import com.android.internal.telephony.util.TelephonyUtils;
 import com.android.telephony.Rlog;
+import com.android.internal.telephony.RIL;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -521,8 +522,8 @@ public class UiccSlot extends Handler {
         }
 
         log("onIccSwap: isHotSwapSupported is false, prompt for rebooting");
-
-        promptForRestart(isAdded);
+        if(!RIL.needsOldRilFeature("fakeiccid"))
+            promptForRestart(isAdded);
     }
 
     private void promptForRestart(boolean isAdded) {
