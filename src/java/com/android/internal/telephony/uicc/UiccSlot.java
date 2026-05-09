@@ -28,6 +28,7 @@ import android.content.res.Resources;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -94,6 +95,7 @@ public class UiccSlot extends Handler {
     private AnswerToReset mAtr;
     private boolean mIsRemovable;
     private MultipleEnabledProfilesMode mSupportedMepMode;
+    private int mSlotIndex;
 
     // Map each available portIdx to phoneId
     private HashMap<Integer, Integer> mPortIdxToPhoneId = new HashMap<>();
@@ -122,12 +124,23 @@ public class UiccSlot extends Handler {
      */
     public void update(CommandsInterface ci, IccCardStatus ics, int phoneId, int slotIndex) {
         synchronized (mLock) {
+            String forceSlots = SystemProperties.get("persist.sys.phh.force_euicc_slots", "");
             mPortIdxToPhoneId.put(ics.mSlotPortMapping.mPortIndex, phoneId);
             CardState oldState = mCardState.get(ics.mSlotPortMapping.mPortIndex);
-            mCardState.put(ics.mSlotPortMapping.mPortIndex, ics.mCardState);
+            mSlotIndex = slotIndex;
             mIccIds.put(ics.mSlotPortMapping.mPortIndex, ics.iccid);
             parseAtr(ics.atr);
             mIsRemovable = isSlotRemovable(slotIndex);
+
+            // Force CARDSTATE_PRESENT for eUICC slots when prop is set.
+            // Must run AFTER parseAtr() so mIsEuicc is set, and BEFORE
+            // mCardState.put() so the map reflects the override.
+            if (!forceSlots.isEmpty() && mIsEuicc
+                    && ics.mCardState == CardState.CARDSTATE_ABSENT) {
+                log(phoneId, "update: forcing CARDSTATE_PRESENT for eUICC slot");
+                ics.mCardState = CardState.CARDSTATE_PRESENT;
+            }
+            mCardState.put(ics.mSlotPortMapping.mPortIndex, ics.mCardState);
             // Update supported MEP mode in IccCardStatus if the CardState is present.
             if (ics.mCardState.isCardPresent()) {
                 updateSupportedMepMode(ics.mSupportedMepMode);
@@ -190,6 +203,15 @@ public class UiccSlot extends Handler {
                         mUiccCard.update(mContext, ci, ics, phoneId);
                     }
                 }
+            } else if (!forceSlots.isEmpty() && mIsEuicc && mUiccCard == null) {
+                // Force create EuiccCard for eUICC even when card state is ABSENT
+                // so APDU-based EID loading can run and attempt to read the EID
+                if (DBG) {
+                    log(phoneId,
+                            "update: forcing EuiccCard creation despite ABSENT state");
+                }
+                mUiccCard = new EuiccCard(mContext, ci, ics, phoneId, mLock,
+                        getSupportedMepMode());
             } else {
                 if (mUiccCard != null) {
                     mUiccCard.update(mContext, ci, ics, phoneId);
@@ -205,6 +227,7 @@ public class UiccSlot extends Handler {
     public void update(CommandsInterface[] ci, IccSlotStatus iss, int slotIndex) {
         synchronized (mLock) {
             IccSimPortInfo[] simPortInfos = iss.mSimPortInfos;
+            mSlotIndex = slotIndex;
             parseAtr(iss.atr);
             mEid = iss.eid;
             mIsRemovable = isSlotRemovable(slotIndex);
@@ -443,6 +466,15 @@ public class UiccSlot extends Handler {
     }
 
     private void checkIsEuiccSupported() {
+        String forceSlots = SystemProperties.get("persist.sys.phh.force_euicc_slots", "");
+        if (!forceSlots.isEmpty()) {
+            for (String s : forceSlots.split(",")) {
+                if (s.trim().equals(String.valueOf(mSlotIndex))) {
+                    mIsEuicc = true;
+                    return;
+                }
+            }
+        }
         if (mAtr == null) {
             mIsEuicc = false;
             return;
