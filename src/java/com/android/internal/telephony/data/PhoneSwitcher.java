@@ -1243,6 +1243,10 @@ public class PhoneSwitcher extends Handler {
             // Skip ALLOW_DATA for single SIM device
             if (mActiveModemCount > 1) {
                 PhoneFactory.getPhone(phoneId).mCi.setDataAllowed(isPhoneActive(phoneId), message);
+            } else {
+                // No modem command is needed, but its completion still publishes the active sub.
+                AsyncResult.forMessage(message);
+                message.sendToTarget();
             }
         } else if (phoneId == mPreferredDataPhoneId) {
             // Only setPreferredDataModem if the phoneId equals to current mPreferredDataPhoneId
