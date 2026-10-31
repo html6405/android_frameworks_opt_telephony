@@ -1518,6 +1518,24 @@ public class PhoneSwitcherTest extends TelephonyTest {
     }
 
     @Test
+    public void testSingleSimLegacyDataCommandNotifiesActiveSubscription() throws Exception {
+        mActiveModemCount = 1;
+        mSupportedModemCount = 1;
+        doReturn(false).when(mMockRadioConfig).isSetPreferredDataCommandSupported();
+        initialize();
+        setSlotIndexToSubId(0, 1);
+        setDefaultDataSubId(1);
+        clearInvocations(mTelephonyRegistryManager, mCommandsInterface0, mMockRadioConfig);
+
+        mPhoneSwitcherUT.onRadioCapChanged(0);
+        processAllMessages();
+
+        verify(mCommandsInterface0, never()).setDataAllowed(anyBoolean(), any());
+        verify(mMockRadioConfig, never()).setPreferredDataModem(anyInt(), any());
+        verify(mTelephonyRegistryManager).notifyActiveDataSubIdChanged(1);
+    }
+
+    @Test
     @SmallTest
     public void testMultiSimConfigChange() throws Exception {
         doReturn(true).when(mMockRadioConfig).isSetPreferredDataCommandSupported();
