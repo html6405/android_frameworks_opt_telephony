@@ -1125,6 +1125,14 @@ public class PhoneSwitcher extends Handler {
             sb.append(" preferred data phoneId ").append(oldPreferredDataPhoneId)
                     .append("->").append(mPreferredDataPhoneId);
             diffDetected = true;
+            if (mActiveModemCount == 1 && mHalCommandToUse == HAL_COMMAND_ALLOW_DATA
+                    && SubscriptionManager.isValidPhoneId(mPreferredDataPhoneId)
+                    && isPhoneActive(mPreferredDataPhoneId)) {
+                // Radio can activate the only phone before its SIM/default sub is ready.
+                // activate() then skips this unchanged active phone, so complete the skipped
+                // single-SIM command again to publish the newly selected subscription.
+                sendRilCommands(mPreferredDataPhoneId);
+            }
         } else if (oldPreferredDataSubId != mPreferredDataSubId.get()) {
             logl("SIM refresh, notify dds change");
             // Inform connectivity about the active data phone

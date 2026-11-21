@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -1530,6 +1531,36 @@ public class PhoneSwitcherTest extends TelephonyTest {
         mPhoneSwitcherUT.onRadioCapChanged(0);
         processAllMessages();
 
+        verify(mCommandsInterface0, never()).setDataAllowed(anyBoolean(), any());
+        verify(mMockRadioConfig, never()).setPreferredDataModem(anyInt(), any());
+        verify(mTelephonyRegistryManager).notifyActiveDataSubIdChanged(1);
+    }
+
+    @Test
+    public void testSingleSimLegacyPublishesSubAfterRadioActivatedPhone() throws Exception {
+        mActiveModemCount = 1;
+        mSupportedModemCount = 1;
+        doReturn(false).when(mMockRadioConfig).isSetPreferredDataCommandSupported();
+        // initialize() delivers radio-on before a SIM or default data sub is available.
+        initialize();
+        assertTrue(mPhoneSwitcherUT.isPhoneActive(0));
+        verify(mTelephonyRegistryManager, atLeastOnce()).notifyActiveDataSubIdChanged(
+                SubscriptionManager.INVALID_SUBSCRIPTION_ID);
+
+        // SIM mapping becomes available before the default data subscription is selected.
+        setSlotIndexToSubId(0, 1);
+        mSubChangedListener.onSubscriptionsChanged();
+        processAllMessages();
+        assertEquals(SubscriptionManager.INVALID_PHONE_INDEX,
+                mPhoneSwitcherUT.mPreferredDataPhoneId);
+        clearInvocations(mTelephonyRegistryManager, mCommandsInterface0, mMockRadioConfig);
+
+        // The preferred phone changes to the already active phone: no new radio event.
+        setDefaultDataSubId(1);
+        processAllMessages();
+
+        assertTrue(mPhoneSwitcherUT.isPhoneActive(0));
+        assertEquals(1, mPhoneSwitcherUT.getActiveDataSubId());
         verify(mCommandsInterface0, never()).setDataAllowed(anyBoolean(), any());
         verify(mMockRadioConfig, never()).setPreferredDataModem(anyInt(), any());
         verify(mTelephonyRegistryManager).notifyActiveDataSubIdChanged(1);
