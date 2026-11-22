@@ -1543,7 +1543,13 @@ public class PhoneSwitcherTest extends TelephonyTest {
         doReturn(false).when(mMockRadioConfig).isSetPreferredDataCommandSupported();
         // initialize() delivers radio-on before a SIM or default data sub is available.
         initialize();
-        assertTrue(mPhoneSwitcherUT.isPhoneActive(0));
+        java.lang.reflect.Method isPhoneActive =
+                PhoneSwitcher.class.getDeclaredMethod("isPhoneActive", int.class);
+        isPhoneActive.setAccessible(true);
+        Field preferredDataPhoneId =
+                PhoneSwitcher.class.getDeclaredField("mPreferredDataPhoneId");
+        preferredDataPhoneId.setAccessible(true);
+        assertTrue((boolean) isPhoneActive.invoke(mPhoneSwitcherUT, 0));
         verify(mTelephonyRegistryManager, atLeastOnce()).notifyActiveDataSubIdChanged(
                 SubscriptionManager.INVALID_SUBSCRIPTION_ID);
 
@@ -1552,14 +1558,14 @@ public class PhoneSwitcherTest extends TelephonyTest {
         mSubChangedListener.onSubscriptionsChanged();
         processAllMessages();
         assertEquals(SubscriptionManager.INVALID_PHONE_INDEX,
-                mPhoneSwitcherUT.mPreferredDataPhoneId);
+                preferredDataPhoneId.getInt(mPhoneSwitcherUT));
         clearInvocations(mTelephonyRegistryManager, mCommandsInterface0, mMockRadioConfig);
 
         // The preferred phone changes to the already active phone: no new radio event.
         setDefaultDataSubId(1);
         processAllMessages();
 
-        assertTrue(mPhoneSwitcherUT.isPhoneActive(0));
+        assertTrue((boolean) isPhoneActive.invoke(mPhoneSwitcherUT, 0));
         assertEquals(1, mPhoneSwitcherUT.getActiveDataSubId());
         verify(mCommandsInterface0, never()).setDataAllowed(anyBoolean(), any());
         verify(mMockRadioConfig, never()).setPreferredDataModem(anyInt(), any());
